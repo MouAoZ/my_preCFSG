@@ -1,6 +1,8 @@
 import Mathlib.GroupTheory.Subgroup.Center
 import Mathlib.Data.Set.Finite.Basic
 import Mathlib.GroupTheory.Subgroup.Simple
+import Mathlib.GroupTheory.GroupAction.Basic
+import Mathlib.Data.Set.Basic
 set_option linter.all false
 
 -- We work with a finite group G
@@ -132,9 +134,113 @@ theorem semisimple_structure (X : Set (Subgroup G)) (hX : SemisimpleCollection X
   constructor
   rw [IsInternalDirectProduct]
   intro T hT
-  have h_sSup_normal : (sSup (X \ {T})).Normal := by
-    -- We define normality by showing conjugation stays inside the subgroup
-    refine Subgroup.Normal.mk (fun g h h_mem => ?_)
+  -- Step 3: 对 T ∈ X，令 K = 其余成员的乘积，证明 K 中心化 T
+  let K := sSup (X \ {T} : Set (Subgroup G))
+
+  have hK_centralizes_T : ∀ k ∈ K, ∀ t ∈ T, k * t = t * k := by
+  -- 先证明一个引理：所有生成元都中心化 T
+    have h_generators_centralize : ∀ (S : Subgroup G) (hS : S ∈ X \ {T}),
+      ∀ s ∈ S, ∀ t ∈ T, s * t = t * s := by
+        intro S hS s hsS t htT
+      -- S ∈ X \ {T} 意味着 S ∈ X 且 S ≠ T
+        have hS_in_X : S ∈ X := (Set.mem_diff S).mp hS |>.1
+        have hS_ne_T : S ≠ T := by
+          intro eq
+          have hT_in : T ∈ X \ {T} := by rwa [eq] at hS
+          simp at hT_in
+        have hT_ne_S : T ≠ S := Ne.symm hS_ne_T
+    -- 由 Step 2 的 h_centralize，S 和 T 互相中心化
+        have hT_min_normal : IsMinimalNormal T := h_X_min_normal T hT
+
+  -- 现在使用 hT_min_normal 而不是 hT
+    --exact h_centralize U hU_in_X T  hU_ne_T x hxU t htT
+        exact h_centralize S hS_in_X T hT_min_normal hT_ne_S s hsS t htT
+
+  -- 现在证明 K 中任意元素与 T 交换
+    intro k hk t htT
+
+
+  -- 关键：K 是由 X \ {T} 生成的子群
+  -- 我们需要对 k ∈ K 进行结构归纳-- 在 Lean 中，可以用 Subgroup.closure_induction
+
+
+
+    let gens : Set G := ⋃ (S : Subgroup G) (_ : S ∈ X \ {T}), (S : Set G)
+    let W := Subgroup.closure gens
+    have hK_eq_closure : K = Subgroup.closure gens := by
+    -- 需要证明 sSup (X \ {T}) = closure (⋃₀ (X \ {T}))
+    -- 这是子群的基本性质：sSup 等于生成元的 closure
+      sorry  -- 这里可以用 mathlib 中的定理
+
+
+    rw [hK_eq_closure] at hk
+
+  -- 现在可以对生成元集 gens 使用 closure_induction
+    --let P : G → Prop := fun z => z * t = t * z
+    --apply @Subgroup.closure_induction G _ gens P
+    apply Subgroup.closure_induction
+      (k := gens)
+      (p := fun g _ => g * t = t * g)
+    {
+      rintro g hg  -- hg : g ∈ gens
+
+     -- 展开 gens 的定义
+      simp [gens] at hg
+      -- 现在 hg : ∃ (U : Subgroup G) (_ : U ∈ X \ {T}), g ∈ U
+
+      rcases hg with ⟨U, hU_mem, hgU⟩
+      -- U : Subgroup G
+      -- hU_mem : U ∈ X \ {T}
+      -- hgU : g ∈ U
+
+      -- 分解 hU_mem 得到 U ∈ X 和 U ≠ T
+      have hU_in_X : U ∈ X := hU_mem.1
+      have hU_ne_T : U ≠ T := hU_mem.2
+
+      -- U 是极小正规子群
+      have hU_min_normal : IsMinimalNormal U := h_X_min_normal U hU_in_X
+
+      -- T 也是极小正规子群
+      have hT_min_normal : IsMinimalNormal T := h_X_min_normal T hT
+
+  -- 用 h_centralize：U 中的元素与 T 中的元素交换
+      exact h_centralize U hU_in_X T hT_min_normal hU_ne_T.symm g hgU t htT
+    }
+
+
+  -- 现在有：
+  -- x : G
+  -- hx_mem : x ∈ closure gens
+  -- hx : x * t = t * x
+  -- 需要证明：x⁻¹ * t = t * x⁻¹
+    simp
+
+
+   -- 单位元情况
+
+
+     -- 乘法情况
+    rintro x y _ _ hx hy
+    calc (x * y) * t = x * (y * t) := by rw [mul_assoc]
+                _ = x * (t * y) := by rw [hy]
+                _ = (x * t) * y := by rw [←mul_assoc]
+                _ = (t * x) * y := by rw [hx]
+                _ = t * (x * y) := by rw [mul_assoc]
+
+
+    rintro x hx_mem hx  -- 忽略 x ∈ closure gens 的证明
+    calc
+      x⁻¹ * t = x⁻¹ * (t * (x * x⁻¹)) := by simp
+      _ = x⁻¹ * ((t * x) * x⁻¹) := by simp [mul_assoc]
+      _ = (x⁻¹ * (t * x)) * x⁻¹ := by simp [mul_assoc]
+      _ = (x⁻¹ * (x * t)) * x⁻¹ := by simpa [hx]
+      _ = ((x⁻¹ * x) * t) * x⁻¹ := by simp
+      _ = (1 * t) * x⁻¹ := by simp
+      _ = t * x⁻¹ := by simp
+
+   -- 最后提供 hk : k ∈ closure (X \ {T})
+    exact hk
+
     -- Step 1: Expose the closure hiding inside sSup so induction works
     -- rw [Subgroup.sSup_eq_closure] at h_mem ⊢
 
